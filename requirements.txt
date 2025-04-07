@@ -1,0 +1,8 @@
+torch
+transformers
+chromadb
+typer
+rich
+sentence-transformers
+accelerate
+bitsandbytes

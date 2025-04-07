@@ -176,8 +176,7 @@ def main(
                 3. Format your response like this:
                     **Estimated Total Working Days**: X days  
                     **Justification**: [Provide a brief explanation for how the estimate was calculated based on the relevant entries from the context.]
-                    **Context Used**:
-                   [List each relevant item from the context along with the respective working days (e.g., "Task A requires 3 working days"). Include only the relevant parts.]
+                    **Context Used**: [List each relevant item from the context along with the respective working days (e.g., "Task A requires 3 working days"). Include only the relevant parts.]
                 """
             
 

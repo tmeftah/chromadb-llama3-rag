@@ -39,7 +39,7 @@ def get_embeddings(texts, embed_tokenizer, embed_model):
     return embeddings
 
 
-def query_db(question, collection, embed_tokenizer, embed_model, threshold=0.3, top_k=4):
+def query_db(question, collection, embed_tokenizer, embed_model, threshold=0.6, top_k=4):
     """Queries the ChromaDB collection for relevant documents."""
     q_embeddings = get_embeddings([question], embed_tokenizer, embed_model)
     results = collection.query(query_embeddings=q_embeddings.numpy().tolist(), n_results=top_k, include=["documents", "distances"])
@@ -48,10 +48,13 @@ def query_db(question, collection, embed_tokenizer, embed_model, threshold=0.3, 
 
     # Filter based on relevance
     relevant_documents = []
+    relevant_distances = []
     for i, doc in enumerate(documents):
       if distances[i] <= threshold:  # Higher similarity score means better relevance
           relevant_documents.append(doc)
-    return relevant_documents
+          relevant_distances.append(distances[i])
+
+    return relevant_documents, relevant_distances
 
 
 def initialize_chroma_db(documents, embed_tokenizer, embed_model, collection_name="document_collection"):
@@ -61,7 +64,10 @@ def initialize_chroma_db(documents, embed_tokenizer, embed_model, collection_nam
         collection = client.get_collection(name=collection_name)
         console.print(f"[bold green]Collection '{collection_name}' already exists. Using existing collection.[/bold green]")
     except :
-        collection = client.create_collection(collection_name)
+        collection = client.create_collection(collection_name, metadata={
+        "hnsw:space": "cosine",
+        "hnsw:search_ef": 100
+    })
         console.print(f"[bold green]Creating new collection: '{collection_name}'[/bold green]")
 
         # Process each chunk: embed it and add it to the ChromaDB collection.
@@ -148,50 +154,70 @@ def main(
         with console.status("[bold blue]Processing your request...[/bold blue]") as status:
             # Querying database
             start_time = time.time()
-            relevant_documents = query_db(question, collection, embed_tokenizer, embed_model)
-            context = '\n\n'.join(relevant_documents)
+            relevant_documents, relevant_distances = query_db(question, collection, embed_tokenizer, embed_model)
+            context = '\n\n'.join(relevant_documents)            
             query_db_time = time.time() - start_time
 
-            query = f"""Your task is to determine the estimated working days required to complete the following customer request based on the provided context details:
-                    {context}
-                    ---------------
-                    Customer Request::
-                    {question}
-                    ---------------
-                    Instructions:
-                    Use only the context entries that are directly relevant to the customer's request.
-                    If needed combine the working day estimates appropriately for the aspects of the request .
-                    Provide the total estimated working days along with a brief justification.
-                    """
+            if not context.strip():  # Check if the context is empty
+                answer = "I'm sorry, I cannot provide an estimate as there is no relevant information available in the provided context."
+                answer_generation_time= 0.0
+            else:
+                query = f"""Your task is to determine the estimated working days required to complete the following customer request based on the provided context details:
+                {context}
+                ---------------
+                Customer Request::
+                {question}
+                ---------------
+                - If the provided context is empty or does not contain directly relevant information for the customer's request, respond with: 
+                    "I'm sorry, I cannot provide an estimate as there is no relevant information available in the provided context."
+                - If the context contains relevant information, follow the steps below:
+                1. Extract only the entries from the context that are directly relevant to the customer's request.
+                2. Combine the working day estimates appropriately for the aspects of the request, if necessary.
+                3. Format your response like this:
+                    **Estimated Total Working Days**: X days  
+                    **Justification**: [Provide a brief explanation for how the estimate was calculated based on the relevant entries from the context.]
+                    **Context Used**:
+                   [List each relevant item from the context along with the respective working days (e.g., "Task A requires 3 working days"). Include only the relevant parts.]
+                """
+            
 
-            # Generating answer
-            start_time = time.time()
-            messages = [
-                {"role": "user", "content": query},
-            ]
-            result = qa_model(messages, max_new_tokens=512, temperature=0.1, top_p=0.95)
-            answer = result[0]["generated_text"][1]["content"]
-            answer_generation_time = time.time() - start_time
+                # Generating answer
+                start_time = time.time()
+                messages = [
+                    {"role": "user", "content": query},
+                ]
+                result = qa_model(messages, max_new_tokens=512, temperature=0.1, top_p=0.95)
+                answer = result[0]["generated_text"][1]["content"]
+                answer_generation_time = time.time() - start_time
 
 
         # Display the results with rich:
         console.print(Panel(question, title="[bold magenta]Question[/bold magenta]", border_style=BORDER_COLOR))
         console.print(Panel(Markdown(answer), title="[bold green]Answer[/bold green]", border_style=BORDER_COLOR))
-        console.print(Panel(Markdown(context), title="[bold cyan]Context[/bold cyan]", border_style=BORDER_COLOR))
+
+        # Format the context with distances
+        context_with_distances = ""
+        for i, doc in enumerate(relevant_documents):
+            context_with_distances += (
+                f"[bold cyan]Document {i+1}:[/bold cyan] {doc}\n"
+                f"[bold yellow]Distance:[/bold yellow] [green]{relevant_distances[i]:.4f}[/green]\n\n"
+            )
+
+        console.print(Panel(context_with_distances, title="[bold cyan]Context with Distances[/bold cyan]", border_style=BORDER_COLOR))
         #console.print("-" * 40)
 
         # Loading information
-        timing_info = f"""
-  [bold blue]Model Load Time:[/bold blue] {model_load_time:.2f} seconds
-  [bold blue]Document Load Time:[/bold blue] {document_load_time:.2f} seconds
-  [bold blue]Chroma DB Initialization Time:[/bold blue] {chroma_init_time:.2f} seconds
-  [bold blue]Query DB Time:[/bold blue] {query_db_time:.2f} seconds
-  [bold blue]Answer Generation Time:[/bold blue] {answer_generation_time:.2f} seconds
-        """
-        console.print(Panel(timing_info, title="[bold yellow]Processing Times[/bold yellow]", border_style=BORDER_COLOR))
+        timing_info = Panel(
+            f"[bold blue]Model Load Time:[/bold blue] [green]{model_load_time:.2f} seconds[/green]\n"
+            f"[bold blue]Document Load Time:[/bold blue] [green]{document_load_time:.2f} seconds[/green]\n"
+            f"[bold blue]Chroma DB Initialization Time:[/bold blue] [green]{chroma_init_time:.2f} seconds[/green]\n"
+            f"[bold blue]Query DB Time:[/bold blue] [green]{query_db_time:.2f} seconds[/green]\n"
+            f"[bold blue]Answer Generation Time:[/bold blue] [green]{answer_generation_time:.2f} seconds[/green]",
+            title="[bold yellow]Processing Times[/bold yellow]",
+            border_style=BORDER_COLOR,
+        )
+        console.print(timing_info)
         console.print("-" * 40)
-
-
 
 if __name__ == "__main__":
     typer.run(main)

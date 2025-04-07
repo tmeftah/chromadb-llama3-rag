@@ -39,11 +39,19 @@ def get_embeddings(texts, embed_tokenizer, embed_model):
     return embeddings
 
 
-def query_db(question, collection, embed_tokenizer, embed_model, top_k=4):
+def query_db(question, collection, embed_tokenizer, embed_model, threshold=0.3, top_k=4):
     """Queries the ChromaDB collection for relevant documents."""
     q_embeddings = get_embeddings([question], embed_tokenizer, embed_model)
-    results = collection.query(query_embeddings=q_embeddings.numpy().tolist(), n_results=top_k, include=["documents"])
-    return results
+    results = collection.query(query_embeddings=q_embeddings.numpy().tolist(), n_results=top_k, include=["documents", "distances"])
+    documents = results['documents'][0]
+    distances = results['distances'][0]
+
+    # Filter based on relevance
+    relevant_documents = []
+    for i, doc in enumerate(documents):
+      if distances[i] <= threshold:  # Higher similarity score means better relevance
+          relevant_documents.append(doc)
+    return relevant_documents
 
 
 def initialize_chroma_db(documents, embed_tokenizer, embed_model, collection_name="document_collection"):
@@ -140,8 +148,8 @@ def main(
         with console.status("[bold blue]Processing your request...[/bold blue]") as status:
             # Querying database
             start_time = time.time()
-            results = query_db(question, collection, embed_tokenizer, embed_model)
-            context = '\n\n'.join(results['documents'][0])
+            relevant_documents = query_db(question, collection, embed_tokenizer, embed_model)
+            context = '\n\n'.join(relevant_documents)
             query_db_time = time.time() - start_time
 
             query = f"""Your task is to determine the estimated working days required to complete the following customer request based on the provided context details:

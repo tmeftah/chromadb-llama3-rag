@@ -109,7 +109,27 @@ def main(
         qa_file: str = "qa.txt",
         collection_name: str = "document_collection"
 ):
-    """Main function to run the QA system."""
+    """Main function to run the QA system within the context of a rich panel."""
+
+    # Enhanced header panel
+    header_panel = Panel(       
+        "[bold yellow]Welcome to Aufwandrechner system![/bold yellow]\n\n"
+        "[bold green]How it works:[/bold green]\n"
+        "- Ask your question about working day estimates for specific tasks or objectives.\n"
+        "- The system searches through the context and provides estimates based on relevant information.\n"
+        "- If the context does not contain relevant information, the system will let you know.\n\n"
+        "[bold cyan]Examples of questions you can ask:[/bold cyan]\n"
+        "- \"How many working days are required for task X?\"\n"
+        "- \"What is the estimated time for project Y?\"\n\n"
+        "[bold red]General Tips:[/bold red]\n"
+        "- Use clear and concise language for better results.\n"
+        "- If you need to exit, type [bold]'exit'[/bold] or press [bold]CTRL+C[/bold].\n\n"
+        "[bold blue]Have a productive session! �[/bold blue]",
+        border_style=BORDER_COLOR,
+        title="[bold cyan]Aufwandrechner[/bold cyan]"
+        
+    )
+    console.print(header_panel)
 
     # Load history at startup
     load_history()
@@ -139,12 +159,12 @@ def main(
         status.update("[bold green]Chroma DB initialized.[/bold green]")
         time.sleep(0.3)
 
+    # App loop for handling questions
     while True:
-        # Beautifully formatted input
-        try: # Add try-except block to gracefully handle KeyboardInterrupt
+        try:
             question = console.input("[bold magenta]> [/bold magenta][bold]What is your question? (Type 'exit' to quit):[/bold] ")
         except KeyboardInterrupt:
-            console.print("\n[bold red]Exiting...[/bold red]")  # Print message on Ctrl+C
+            console.print("\n[bold red]Exiting...[/bold red]")  # Gracefully handle Ctrl+C
             break
 
         if question.lower() == "exit":
@@ -217,6 +237,7 @@ def main(
         )
         console.print(timing_info)
         console.print("-" * 40)
+
 
 if __name__ == "__main__":
     typer.run(main)

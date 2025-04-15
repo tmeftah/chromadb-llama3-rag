@@ -191,7 +191,7 @@ def get_cluster_topics(sentences: list, clusters: np.ndarray, model_name: str = 
 
 
 def main(
-    file_path: Annotated[Path, typer.Option(help="Path to the input text file.")] = Path("new_dataset.txt"),
+    file_path: Annotated[Path, typer.Option(help="Path to the input text file.")] = Path("qa.txt"),
     model_name: Annotated[str, typer.Option(help="Name of the sentence transformer model.")] = "sentence-transformers/all-MiniLM-L6-v2",
     n_clusters: Annotated[int, typer.Option(help="Number of clusters for KMeans.")] = 5,
     output_path: Annotated[Path, typer.Option(help="Path to save the cluster plot.")] = Path("cluster_plot.png"),

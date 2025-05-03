@@ -1,3 +1,4 @@
+# use gpu to embed
 import torch
 from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
 from sentence_transformers import CrossEncoder

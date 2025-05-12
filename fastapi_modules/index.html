@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Project Effort Estimator – AI Question Answering</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts - Inter (a professional and modern font) -->
+    <link href="https://fonts.google.com/specimen/Inter?family=Inter:wght400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons (for the trash icon) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            overflow-x: hidden; /* Prevent horizontal scroll due to sidebar */
+        }
+        .sidebar {
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            overflow-y: auto; /* Enable vertical scrolling for history */
+        }
+        .sidebar h5 {
+            margin-bottom: 15px;
+            color: #34495e;
+            font-weight: 600;
+        }
+        .history-item {
+            background-color: #f1f3f5;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-item:hover {
+            background-color: #e9ecef;
+        }
+         .history-item.active {
+            background-color: #dee2e6;
+            font-weight: 500;
+        }
+        .history-item-content {
+            flex-grow: 1;
+            margin-right: 5px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .history-item-content strong {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 3px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .history-item-content span {
+             display: block;
+            font-size: 0.8em;
+            color: #6c757d;
+             overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .history-delete-btn {
+             background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            padding: 0;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             width: 20px;
+             height: 20px;
+        }
+        .history-delete-btn:focus {
+            outline: none;
+        }
+         .history-delete-btn i {
+             font-size: 0.9em;
+         }
+
+        .main-content {
+            margin-left: 250px; /* Push content to the right of the sidebar */
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .logo {
+            width: 50px;
+            margin-right: 15px;
+        }
+        .header-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #34495e;
+        }
+        .answer-label, .documents-label {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 10px;
+        }
+        .answer-box {
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            padding: 15px;
+            min-height: 100px;
+            white-space: pre-wrap; /* Preserve line breaks from the API */
+            word-wrap: break-word;
+        }
+         .answer-box.error {
+             background-color: #f8d7da; /* Light red */
+             border-color: #f5c6cb;
+             color: #721c24; /* Dark red */
+         }
+        .answer-box.waiting {
+             font-style: italic;
+             color: #6c757d;
+         }
+
+        .no-documents {
+            font-style: italic;
+        }
+
+        /* Document card styles */
+        .card {
+            margin-bottom: 10px; /* Reduced margin */
+            border: 1px solid #e9ecef;
+        }
+        .card-header {
+             background-color: #f1f3f5;
+             padding: 0.5rem 1rem; /* Reduced padding */
+        }
+         .card-header h2 {
+             margin-bottom: 0;
+         }
+        .card-header button {
+            font-size: 0.7em; /* Smaller font for header button */
+            padding: 0; /* Remove button padding */
+        }
+        .card-body {
+            padding: 0.75rem 1rem; /* Reduced padding */
+        }
+         .card-body .card-subtitle {
+             font-size: 0.8em; /* Smaller font for subtitle */
+             margin-bottom: 5px; /* Reduced margin */
+             color: #6c757d;
+         }
+        .card-body .card-text {
+            font-size: 0.85em; /* Smaller font for text */
+             max-height: 120px; /* Slightly limit the height of the context */
+             overflow-y: auto;
+             color: #495057;
+             white-space: pre-wrap; /* Preserve line breaks */
+            word-wrap: break-word; /* Break long words */
+        }
+
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        /* Media query for smaller screens to hide sidebar and adjust main content */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: static; /* Allow sidebar to flow naturally */
+                width: 100%;
+                height: auto;
+                box-shadow: none;
+                 padding: 15px;
+                 margin-bottom: 20px;
+            }
+            .main-content {
+                margin-left: 0; /* Remove the left margin */
+                padding: 15px;
+                 padding-top: 0;
+            }
+            .header-title {
+                 font-size: 1.5em;
+             }
+            .logo {
+                width: 40px;
+                margin-right: 10px;
+            }
+            .sidebar h5{
+                 margin-bottom: 10px;
+            }
+             .history-item {
+                 padding: 8px;
+                 margin-bottom: 8px;
+             }
+             .history-item-content strong {
+                 font-size: 0.85em;
+             }
+              .history-item-content span {
+                 font-size: 0.75em;
+             }
+             /* Adjust document font sizes for smaller screens */
+            .card-header button {
+                 font-size: 0.85em;
+             }
+             .card-body .card-subtitle,
+             .card-body .card-text {
+                 font-size: 0.8em;
+             }
+              .card-body .card-text {
+                  max-height: 100px; /* Further limit height on small screens */
+              }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h5>History</h5>
+        <div id="historyList">
+            <!-- History items will be added here by JavaScript -->
+             <div class="text-center text-muted" style="font-size: 0.9rem;">History will appear here.</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            <div class="d-flex align-items-center mb-5">
+                <img src="https://cdn-icons-png.flaticon.com/512/4003/4003100.png" class="logo" alt="AI Icon">
+                <span class="header-title">Project Effort Estimator</span>
+            </div>
+            <div class="mb-5">
+                <label for="questionInput" class="form-label fs-5">What do you need an estimate for?</label>
+                <div class="input-group">
+                    <input type="text" class="form-control form-control-lg" id="questionInput" placeholder="E.g. Estimate for adding user authentication with OAuth and building a new REST API..." aria-label="Project estimation question input">
+                    <button class="btn btn-primary btn-lg" type="button" id="askButton">Get Estimate</button>
+                </div>
+            </div>
+            <div class="result-section">
+                <div class="mb-4">
+                    <div class="answer-label">AI Estimated Effort</div>
+                    <div id="answerText" class="answer-box waiting">Enter a question above to get your estimate...</div>
+                </div>
+                <div>
+                    <div class="documents-label mb-2">Supporting Examples (Click to view details)</div>
+                    <div id="documentsSection" class="card-group flex-column">
+                         <div class="text-center text-secondary no-documents">Relevant past project examples will appear here to support the estimate.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer">
+                <span>Effort Estimation © 2024 &ndash; Powered by AI based on internal project data.</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const historyLimit = 5; // Limit the history to the last 5 items
+        const localStorageKey = 'projectEstimatorHistory'; // Key for localStorage
+        let history = []; // Array to store history items
+        let currentActiveIndex = null; // Variable to track the index of the currently active item
+
+        // Function to create the document card HTML (kept from previous)
+         function createDocumentCard(document, idx) {
+             const customer = document.customer || 'N/A';
+             const offer = document.offer || 'N/A';
+             const createdOn = document.created_on || 'N/A';
+             const workingDays = document.working_days !== undefined ? document.working_days : 'N/A';
+             const customerNumber = document.customer_number || 'N/A'; // Get customer number
+             const context = document.context ? document.context.replace(/\n/g, '<br>') : 'No context available.';
+
+             const collapseId = `documentCollapse${idx}`;
+
+             return `
+                 <div class="card">
+                     <div class="card-header" id="heading${idx}">
+                         <h2 class="mb-0">
+                             <button class="btn btn-link w-100 text-start text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}" style="color: #34495e; font-weight: 600;">
+                                 ${workingDays} Days | Offer Number: ${offer} | ${createdOn}
+                             </button>
+                         </h2>
+                     </div>
+                     <div id="${collapseId}" class="collapse" aria-labelledby="heading${idx}">
+                         <div class="card-body">
+                             <div class="card-subtitle">${customer} | ${customerNumber}</div>
+                             <div class="card-text">${context}</div>
+                         </div>
+                     </div>
+                 </div>
+             `;
+         }
+
+
+         // Function to render the history items in the sidebar
+         function renderHistory() {
+             const historyListElement = $("#historyList");
+             historyListElement.empty(); // Clear previous history items
+
+             if (history.length === 0) {
+                 historyListElement.html('<div class="text-center text-muted" style="font-size: 0.9rem;">History will appear here.</div>');
+                  currentActiveIndex = null; // Clear active index if history is empty
+                 saveHistory(); // Save empty history
+                 return;
+             }
+
+             history.forEach(function(item, index) {
+                 const historyItem = $(`
+                     <div class="history-item ${index === currentActiveIndex ? 'active' : ''}" data-index="${index}">
+                        <div class="history-item-content">
+                             <strong>${item.question}</strong>
+                             <span>${item.answer || 'Pending...'}</span>
+                        </div>
+                         <button class="history-delete-btn" data-index="${index}" title="Delete History Item">
+                            <i class="bi bi-trash"></i>
+                         </button>
+                     </div>
+                 `);
+
+                 // Attach click event listeners
+                 historyItem.find('.history-item-content').on('click', function(event) {
+                      event.stopPropagation(); // Prevent event propagation to the main history item div
+                      handleHistoryItemClick($(this).parent('.history-item'), index); // Pass history item element and index
+                 });
+
+                 // Attach click event for the delete button
+                historyItem.find('.history-delete-btn').on('click', function(event) {
+                     event.stopPropagation(); // Prevent event propagation to the main history item div
+                     deleteHistoryItem(index);
+                 });
+
+                 historyListElement.append(historyItem);
+             });
+
+             // Save history to localStorage after rendering
+             saveHistory();
+         }
+
+         // Function to handle click on history item content
+         function handleHistoryItemClick(element, index) {
+              const isActive = element.hasClass('active');
+
+              $('#historyList .history-item').removeClass('active'); // Remove active from all others
+
+              if (isActive) {
+                   // If it was already active, de-activate it and clear main content
+                   currentActiveIndex = null; // Clear active index
+                   clearMainContent();
+              } else {
+                   // If it was not active, make it active and display its result
+                   element.addClass('active');
+                   currentActiveIndex = index; // Set new active index
+                   displayHistoryResult(index); // Display details of the clicked item
+              }
+         }
+
+
+         // Function to display a history item's result
+         function displayHistoryResult(index) {
+            if (index < 0 || index >= history.length) {
+                return; // Invalid index
+            }
+
+            const item = history[index];
+
+            // Populate the main content with the history item's data
+            $("#questionInput").val(item.question); // Fill the input with the history question
+
+            // Set the answer text and class
+            const answerTextElement = $("#answerText");
+            answerTextElement.removeClass("waiting answer-box error"); // Remove all state classes
+            if (item.answer) {
+                 answerTextElement.addClass("answer-box").text(item.answer);
+                 // Check if the answer indicates an error
+                 if (item.answer.includes("Error fetching result") || item.answer.includes("An error occurred")) {
+                      answerTextElement.addClass("error"); // Add error class if it's an error state
+                 }
+            } else {
+                 answerTextElement.addClass("waiting").text("Result not available for this history item.");
+            }
+
+
+            // Re-render documents if available in history
+            $("#documentsSection").empty();
+             if(item.documents && item.documents.length > 0) {
+                 item.documents.forEach(function(doc, idx) {
+                      $("#documentsSection").append(createDocumentCard(doc, idx));
+                 });
+             } else {
+                 $("#documentsSection").html('<div class="text-center text-secondary no-documents">No stored documents for this history item.</div>');
+             }
+
+             // Ensure corresponding input field is not disabled by a previous API call
+            $("#questionInput").prop('disabled', false);
+            $("#askButton").prop('disabled', false).text('Get Estimate');
+         }
+
+         // Function to delete a history item
+         function deleteHistoryItem(index) {
+             if (index < 0 || index >= history.length) {
+                 return; // Invalid index
+             }
+
+             // Check if the item to be deleted is the active one
+             const wasActive = $('#historyList .history-item').eq(index).hasClass('active');
+
+             // Remove the item from the array
+             history.splice(index, 1);
+
+              // Adjust currentActiveIndex if necessary
+              if (wasActive || (currentActiveIndex !== null && index < currentActiveIndex)) {
+                   currentActiveIndex = null;
+                  clearMainContent(); // Also clear main content if the active item was deleted or an item before the active one was deleted
+              } else if (currentActiveIndex !== null && index > currentActiveIndex) {
+                   // If an item after the active one was deleted, the active index remains the same relative to the new array
+                   // currentActiveIndex doesn't need adjustment in this specific case.
+              }
+              // If no item was active when deleting, no need to adjust currentActiveIndex or clear content.
+
+             // Re-render the history list
+             renderHistory();
+
+             // If there are still history items and nothing is active after re-rendering,
+             // highlight and display the details of the first item
+             // This handles the case where the active item was deleted or if no item was active previously.
+             if (history.length > 0 && currentActiveIndex === null) {
+                  $('#historyList .history-item').first().addClass('active');
+                  currentActiveIndex = 0; // Set the first item as active
+                  displayHistoryResult(0);
+             }
+             // If history is empty after deletion, clearMainContent was already called if the active item was deleted.
+         }
+
+
+         // Function to clear the main content area
+         function clearMainContent() {
+              $("#questionInput").val("");
+               $("#answerText").removeClass("answer-box error").addClass("waiting").text("Enter a question above to get your estimate..."); // Reset state classes
+              $("#documentsSection").empty();
+              $("#documentsSection").html('<div class="text-center text-secondary no-documents">Relevant past project examples will appear here to support the estimate.</div>');
+              // Also ensure no history item is marked as active in the UI
+              $('#historyList .history-item').removeClass('active');
+             currentActiveIndex = null; // Crucially, update the tracking variable
+         }
+
+         // Function to save history to localStorage
+         function saveHistory() {
+             try {
+                 const historyJson = JSON.stringify(history);
+                 localStorage.setItem(localStorageKey, historyJson);
+             } catch (e) {
+                 console.error("Error saving history to localStorage:", e);
+                 // Handle potential localStorage limits or errors here
+             }
+         }
+
+         // Function to load history from localStorage
+         function loadHistory() {
+             try {
+                 const historyJson = localStorage.getItem(localStorageKey);
+                 if (historyJson) {
+                     history = JSON.parse(historyJson);
+                     // Ensure history does not exceed the limit on load and is valid
+                     if (!Array.isArray(history)) {
+                         history = []; // Reset if not an array
+                     } else if (history.length > historyLimit) {
+                         // If history somehow exceeded the limit on load, trim it but keep the most recent
+                         history = history.slice(0, historyLimit);
+                     }
+                 } else {
+                     history = []; // Initialize as empty if nothing in storage
+                 }
+                 currentActiveIndex = null; // Reset active index on load; will set first item active below if history exists
+             } catch (e) {
+                 console.error("Error loading history from localStorage:", e);
+                 history = []; // Reset history if there was a loading error
+                 currentActiveIndex = null;
+             }
+         }
+
+
+        function askQuestion(){
+            var question = $("#questionInput").val();
+            if(!question.trim()){
+                // Clear if input is empty, but inform the user to enter a question
+                 clearMainContent();
+                 $("#answerText").removeClass("answer-box error").addClass("waiting").text("Please enter a question to get an estimate.");
+                return;
+            }
+
+             // Clear any active history item before adding a new one
+             $('#historyList .history-item').removeClass('active');
+             currentActiveIndex = null; // Ensure no history item is active in the UI
+             clearMainContent(); // Also clear main content when starting a new query
+
+            // Create a new history item (initially without answer and docs)
+             const newHistoryItem = {
+                 question: question,
+                 answer: null,
+                 documents: null
+             };
+            history.unshift(newHistoryItem); // Add to the beginning of the history
+            if (history.length > historyLimit) {
+                history.pop(); // Remove the oldest item if exceeding limit
+            }
+
+
+            // After adding, the new item is at index 0. Set that as active.
+            currentActiveIndex = 0;
+
+            // Manually set the state for the new query in the main content BEFORE rendering history
+            $("#answerText").removeClass("waiting answer-box error").addClass("answer-box").text("Estimating..."); // Set initial state to 'estimating'
+            $("#documentsSection").empty();
+            $("#documentsSection").html('<div class="text-center text-secondary no-documents">Analyzing past projects for relevant examples...</div>');
+
+            // Render the updated history. The new item (at index 0) will get the 'active' class.
+            renderHistory();
+
+
+            $.ajax({
+                url: "/answer", // Ensure this matches your backend endpoint
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ question: question }),
+                beforeSend: function() {
+                     // Disable input and button while processing
+                     $("#questionInput").prop('disabled', true);
+                     $("#askButton").prop('disabled', true).text('Estimating...');
+                 },
+                 success: function(response) {
+                     // Find the index of the history item corresponding to this query
+                     const itemIndex = history.findIndex(item => item.question === question);
+
+                     if (itemIndex !== -1) { // Ensure the item is still in history
+                         history[itemIndex].answer = response.answer;
+                         history[itemIndex].documents = response.reranked_texts || []; // Store documents if available
+
+                         // Only update the main content if this item is currently active
+                         if (currentActiveIndex === itemIndex) {
+                             const answerTextElement = $("#answerText");
+                            answerTextElement.removeClass("waiting answer-box error"); // Clear previous states
+                            answerTextElement.addClass("answer-box").text(history[itemIndex].answer);
+
+                             $("#documentsSection").empty();
+                             if (history[itemIndex].documents && history[itemIndex].documents.length > 0) {
+                                 history[itemIndex].documents.forEach(function(document, idx) {
+                                     $("#documentsSection").append(createDocumentCard(document, idx));
+                                 });
+                             } else {
+                                 $("#documentsSection").html('<div class="text-center text-secondary no-documents">No highly relevant past project examples found for this query.</div>');
+                             }
+                         }
+                     }
+
+                     renderHistory(); // Re-render history to show the answer and save
+
+                 },
+                error: function(jqXHR, textStatus, errorThrown){
+                    console.error("API Error:", textStatus, errorThrown, jqXHR.responseText); // Log error for debugging
+
+                    // Find the index of the history item corresponding to this query
+                    const itemIndex = history.findIndex(item => item.question === question);
+
+
+                    if (itemIndex !== -1) { // Ensure the item is still in history
+                        history[itemIndex].answer = "Error fetching result.";
+                        history[itemIndex].documents = [];
+
+                        // Only update the main content with the error state if this item is currently active
+                         if (currentActiveIndex === itemIndex) {
+                             const answerTextElement = $("#answerText");
+                             answerTextElement.removeClass("waiting answer-box").addClass("error").text("An error occurred while fetching the estimate. Please try again.");
+                             $("#documentsSection").empty();
+                              $("#documentsSection").html('<div class="text-center text-secondary no-documents">Could not load supporting documents due to an error.</div>');
+                         }
+                    }
+
+
+                     renderHistory(); // Re-render history to show error state and save
+                },
+                 complete: function() {
+                     // Re-enable input and button
+                     $("#questionInput").prop('disabled', false);
+                     $("#askButton").prop('disabled', false).text('Get Estimate');
+                 }
+            });
+        }
+
+        $("#askButton").on("click", function(){
+            askQuestion();
+        });
+        $("#questionInput").on("keypress", function(e){
+            if(e.which == 13) {
+                askQuestion();
+                e.preventDefault();
+            }
+        });
+
+         // --- Initialization ---
+         // 1. Load history from localStorage when the page loads
+         loadHistory();
+         // 2. Render the loaded history
+         renderHistory();
+         // 3. If history is not empty after loading, display the details of the most recent item (index 0)
+          if (history.length > 0) {
+               // The renderHistory call above added the 'active' class based on setting currentActiveIndex = 0.
+               // Now we just need to display the details for that active item.
+              currentActiveIndex = 0; // Ensure tracking variable is set
+              displayHistoryResult(0); // Display the initial active item's details
+          } else {
+              // If history is empty on load, ensure main content is clear
+              clearMainContent();
+          }
+         // --- End Initialization ---
+
+    </script>
+</body>
+</html>
